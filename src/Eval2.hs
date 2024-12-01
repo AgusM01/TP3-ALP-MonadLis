@@ -56,7 +56,6 @@ instance MonadState StateError where
   update v i = StateError (\s -> Right (() :!: update' v i s)) where update' = M.insert
 
 
-
 -- Ejercicio 2.d: Implementar el evaluador utilizando la monada StateError.
 -- Evalua un programa en el estado nulo
 
