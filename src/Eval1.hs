@@ -57,7 +57,7 @@ stepCommStar c    = stepComm c >>= \c' -> stepCommStar c'
 -- Evalua un paso de un comando
 stepComm :: MonadState m => Comm -> m Comm
 stepComm Skip = return Skip -- Nunca va a ser Skip
-stepComm (Let v1 exp) =  do eva <- evalExp exp -- preguntar.
+stepComm (Let v1 exp) =  do eva <- evalExp exp
                             update v1 eva 
                             return Skip 
 stepComm (Seq c1 c2)  = do  sc1 <- stepComm c1 -- Evaluo un paso en ambos.

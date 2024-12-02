@@ -8,6 +8,9 @@ import           AST
 import           Monads
 import qualified Data.Map.Strict               as M
 import           Data.Maybe
+import           Prelude                 hiding ( fst
+                                                , snd
+                                                )
 import           Data.Strict.Tuple
 import           Control.Monad                  ( liftM
                                                 , ap
@@ -60,7 +63,9 @@ instance MonadState StateError where
 -- Evalua un programa en el estado nulo
 
 eval :: Comm -> Either Error Env
-eval = undefined
+eval c = case (runStateError (stepCommStar c) initEnv) of 
+            Right x   -> Right (snd x)
+            Left err  -> Left err   
 
 -- Evalua multiples pasos de un comando, hasta alcanzar un Skip
 stepCommStar :: (MonadState m, MonadError m) => Comm -> m ()
@@ -69,9 +74,66 @@ stepCommStar c    = stepComm c >>= \c' -> stepCommStar c'
 
 -- Evalua un paso de un comando
 stepComm :: (MonadState m, MonadError m) => Comm -> m Comm
-stepComm = undefined
+stepComm Skip = return Skip 
+stepComm (Let var exp) = do eva <- evalExp exp 
+                            update var eva 
+                            return Skip 
+stepComm (Seq c1 c2)   = do sc1 <- stepComm c1 
+                            sc2 <- stepComm c2
+                            return (Seq sc1 sc2)
+stepComm (IfThenElse eb c1 c2) = do val <- evalExp eb 
+                                    if val then return c1 
+                                    else return c2 
+stepComm (Repeat eb c)  = do  val <- evalExp eb 
+                              if val then (return (Repeat eb c))
+                              else return Skip
+
 
 -- Evalua una expresion
 evalExp :: (MonadState m, MonadError m) => Exp a -> m a
-evalExp = undefined
-
+evalExp (Const a) = return a
+evalExp (Var v)   = do  val <- lookfor v -- Ahora si no lo encuentra tira el error.
+                        return val 
+evalExp (UMinus e) = do val <- evalExp e 
+                        return (-val)
+evalExp (Plus e1 e2)  = do  v1 <- evalExp e1
+                            v2 <- evalExp e2 
+                            return (v1 + v2)
+evalExp (Minus e1 e2)  = do v1 <- evalExp e1
+                            v2 <- evalExp e2 
+                            return (v1 - v2)
+evalExp (Times e1 e2)  = do v1 <- evalExp e1
+                            v2 <- evalExp e2 
+                            return (v1 * v2)
+evalExp (Div e1 e2)  = do   v1 <- evalExp e1
+                            v2 <- evalExp e2
+                            if v2 == 0 then throw DivByZero 
+                            else return (div v1 v2)
+evalExp (BTrue)       = return True 
+evalExp (BFalse)      = return False
+evalExp (Lt e1 e2)    = do  v1 <- evalExp e1
+                            v2 <- evalExp e2
+                            return (v1 < v2)
+evalExp (Gt e1 e2)    = do  v1 <- evalExp e1
+                            v2 <- evalExp e2
+                            return (v1 > v2)
+evalExp (And e1 e2)    = do v1 <- evalExp e1
+                            v2 <- evalExp e2
+                            return (v1 && v2)
+evalExp (Or e1 e2)    = do  v1 <- evalExp e1
+                            v2 <- evalExp e2
+                            return (v1 || v2)
+evalExp (Not e) = do  e <- evalExp e
+                      return (not e)
+evalExp (Eq e1 e2) = do v1 <- evalExp e1
+                        v2 <- evalExp e2
+                        return (v1 == v2)
+evalExp (NEq e1 e2) = do  v1 <- evalExp e1
+                          v2 <- evalExp e2
+                          return (v1 /= v2)
+evalExp (IncVar v) = do val <- lookfor v
+                        update v (val + 1) 
+                        return (val + 1)
+evalExp (DecVar v) = do val <- lookfor v
+                        update v (val - 1) 
+                        return (val - 1)
