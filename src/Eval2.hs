@@ -78,15 +78,13 @@ stepComm Skip = return Skip
 stepComm (Let var exp) = do eva <- evalExp exp 
                             update var eva 
                             return Skip 
-stepComm (Seq c1 c2)   = do sc1 <- stepComm c1 
-                            sc2 <- stepComm c2
-                            return (Seq sc1 sc2)
+stepComm (Seq Skip c2)  = return c2 
+stepComm (Seq c1 c2)    = do  sc1 <- stepComm c1 
+                              return (Seq sc1 c2)  
 stepComm (IfThenElse eb c1 c2) = do val <- evalExp eb 
                                     if val then return c1 
-                                    else return c2 
-stepComm (Repeat eb c)  = do  val <- evalExp eb 
-                              if val then (return (Repeat eb c))
-                              else return Skip
+                                    else return c2
+stepComm r@(Repeat eb c) = return (Seq c (IfThenElse eb r Skip)) 
 
 
 -- Evalua una expresion

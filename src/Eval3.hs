@@ -60,10 +60,10 @@ instance MonadError StateErrorTrace where
 -- Ejercicio 3.e: Dar una instancia de MonadState para StateErrorTrace.
 instance MonadState StateErrorTrace where 
     lookfor v = StateErrorTrace (\s -> case (lookfor' v s) of 
-                                Just x -> Right ((x :!: s) :!: v ++ "=" ++ (show x) ++ "\n") 
+                                Just x -> Right ((x :!: s) :!: v ++ " = " ++ (show x) ++ "; ") 
                                 Nothing -> runStateErrorTrace (throw UndefVar) s) 
                     where lookfor' v s = M.lookup v s
-    update v i = StateErrorTrace (\s -> Right ((() :!: update' v i s) :!: v ++ "=" ++ (show i) ++ "\n")) 
+    update v i = StateErrorTrace (\s -> Right ((() :!: update' v i s) :!: v ++ " = " ++ (show i) ++ "; ")) 
                     where update' = M.insert
 -- Ejercicio 3.f: Implementar el evaluador utilizando la monada StateErrorTrace.
 -- Evalua un programa en el estado nulo
@@ -80,87 +80,65 @@ stepCommStar c    = stepComm c >>= \c' -> stepCommStar c'
 
 -- Evalua un paso de un comando
 stepComm :: (MonadState m, MonadError m, MonadTrace m) => Comm -> m Comm  
-stepComm Skip = do addTrace "Skip\n" 
-                   return Skip 
+stepComm Skip =  return Skip
 stepComm (Let var exp) = do eva <-  evalExp exp 
-                            addTrace ("Let" ++ var ++ "=" ++ (show eva) ++ "\n")
+                            addTrace ("Let " ++ var ++ " = " ++ (show eva) ++ "; ")
                             update var eva 
                             return Skip
-stepComm (Seq c1 c2) = do   sc1 <- stepComm c1 
-                            sc2 <- stepComm c2
-                            addTrace "Seq \n"
-                            return (Seq sc1 sc2)
-stepComm (IfThenElse eb c1 c2) = do val <- evalExp eb
-                                    addTrace ("IfThenElse with value: " ++ show val ++ "\n")
-                                    if val then (return c1)
-                                    else (return c2)
-stepComm (Repeat eb c) = do val <- evalExp eb
-                            addTrace ("Repeat with value: " ++ show val ++ "\n")
-                            if val then (return (Repeat eb c))
-                            else return Skip 
+stepComm (Seq Skip c2)  = return c2 
+stepComm (Seq c1 c2)    = do  sc1 <- stepComm c1 
+                              return (Seq sc1 c2)  
+stepComm (IfThenElse eb c1 c2) = do val <- evalExp eb 
+                                    if val then return c1 
+                                    else return c2
+stepComm r@(Repeat eb c) = return (Seq c (IfThenElse eb r Skip)) 
 
 
 -- Evalua una expresion 
 evalExp :: (MonadState m, MonadError m, MonadTrace m) => Exp a -> m a
-evalExp (Const a) = do  addTrace ("Const " ++ (show a) ++ "\n")
-                        return a
+evalExp (Const a) = return a
 evalExp (Var v)   = do  val <- lookfor v -- Ahora si no lo encuentra tira el error.
                         return val 
 evalExp (UMinus e) = do val <- evalExp e 
                         return (-val)
 evalExp (Plus e1 e2)  = do  v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ "+" ++ (show v2) ++ "\n") 
                             return (v1 + v2)
 evalExp (Minus e1 e2)  = do v1 <- evalExp e1
                             v2 <- evalExp e2 
-                            addTrace ((show v1) ++ "-" ++ (show v2) ++ "\n") 
                             return (v1 - v2)
 evalExp (Times e1 e2)  = do v1 <- evalExp e1
                             v2 <- evalExp e2 
-                            addTrace ((show v1) ++ "*" ++ (show v2) ++ "\n") 
                             return (v1 * v2)
 evalExp (Div e1 e2)  = do   v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ "/" ++ (show v2) ++ "\n") 
                             if v2 == 0 then throw DivByZero 
                             else return (div v1 v2)
-evalExp (BTrue)       = do  addTrace "True" 
-                            return True 
-evalExp (BFalse)      = do  addTrace "False"
-                            return False
+evalExp (BTrue)       = do  return True 
+evalExp (BFalse)      = return False
 evalExp (Lt e1 e2)    = do  v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ "<" ++ (show v2) ++ "\n") 
                             return (v1 < v2)
 evalExp (Gt e1 e2)    = do  v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ ">" ++ (show v2) ++ "\n") 
                             return (v1 > v2)
 evalExp (And e1 e2)    = do v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ "&&" ++ (show v2) ++ "\n") 
                             return (v1 && v2)
 evalExp (Or e1 e2)    = do  v1 <- evalExp e1
                             v2 <- evalExp e2
-                            addTrace ((show v1) ++ "||" ++ (show v2) ++ "\n") 
                             return (v1 || v2)
 evalExp (Not e) = do  e <- evalExp e
-                      addTrace ("Not" ++ show e ++ "\n")
                       return (not e)
 evalExp (Eq e1 e2) = do v1 <- evalExp e1
                         v2 <- evalExp e2
-                        addTrace ((show v1) ++ "==" ++ (show v2) ++ "\n") 
                         return (v1 == v2)
 evalExp (NEq e1 e2) = do  v1 <- evalExp e1
                           v2 <- evalExp e2
-                          addTrace ((show v1) ++ "/=" ++ (show v2) ++ "\n") 
                           return (v1 /= v2)
 evalExp (IncVar v) = do val <- lookfor v
-                        addTrace ("Inc. Var: " ++ v ++ "\n")
                         update v (val + 1)
                         return (val + 1)
 evalExp (DecVar v) = do val <- lookfor v
-                        addTrace ("Dec. Var: " ++ v ++ "\n")
                         update v (val - 1) 
                         return (val - 1)

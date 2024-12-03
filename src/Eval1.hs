@@ -60,8 +60,7 @@ stepComm Skip = return Skip -- Nunca va a ser Skip
 stepComm (Let v1 exp) =  do eva <- evalExp exp
                             update v1 eva 
                             return Skip 
-stepComm (Seq Skip c2)  = do  sc2 <- stepComm c2
-                              return (Seq Skip sc2)
+stepComm (Seq Skip c2)  = return c2 
 stepComm (Seq c1 c2)    = do  sc1 <- stepComm c1 
                               return (Seq sc1 c2)  
 stepComm (IfThenElse eb c1 c2) = do val <- evalExp eb 
