@@ -60,10 +60,10 @@ instance MonadError StateErrorTrace where
 -- Ejercicio 3.e: Dar una instancia de MonadState para StateErrorTrace.
 instance MonadState StateErrorTrace where 
     lookfor v = StateErrorTrace (\s -> case (lookfor' v s) of 
-                                Just x -> Right ((x :!: s) :!: v ++ " = " ++ (show x) ++ "; ") 
+                                Just x -> Right ((x :!: s) :!: "Found " ++ v ++ " = " ++ (show x) ++ "; ") 
                                 Nothing -> runStateErrorTrace (throw UndefVar) s) 
                     where lookfor' v s = M.lookup v s
-    update v i = StateErrorTrace (\s -> Right ((() :!: update' v i s) :!: v ++ " = " ++ (show i) ++ "; ")) 
+    update v i = StateErrorTrace (\s -> Right ((() :!: update' v i s) :!: "Updating " ++ v ++ " = " ++ (show i) ++ "; ")) 
                     where update' = M.insert
 -- Ejercicio 3.f: Implementar el evaluador utilizando la monada StateErrorTrace.
 -- Evalua un programa en el estado nulo
@@ -97,7 +97,7 @@ stepComm r@(Repeat eb c) = return (Seq c (IfThenElse eb r Skip))
 -- Evalua una expresion 
 evalExp :: (MonadState m, MonadError m, MonadTrace m) => Exp a -> m a
 evalExp (Const a) = return a
-evalExp (Var v)   = do  val <- lookfor v -- Ahora si no lo encuentra tira el error.
+evalExp (Var v)   = do  val <- lookfor v 
                         return val 
 evalExp (UMinus e) = do val <- evalExp e 
                         return (-val)
